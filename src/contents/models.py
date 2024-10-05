@@ -148,3 +148,114 @@ class MegaEcommerce(models.Model):
             models.Index(fields=['product_id']),
             models.Index(fields=['payment_id']),
         ]
+
+
+class User(models.Model):
+    user_id = models.AutoField(primary_key=True)
+    username = models.CharField(max_length=100, unique=True)
+    email = models.EmailField(unique=True)
+    password_hash = models.CharField(max_length=255)  # Storing password hashes in the same table is a security risk
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    date_of_birth = models.DateField()
+    phone_number = models.CharField(max_length=20)
+    is_admin = models.BooleanField(default=False)
+    addresses = models.JSONField(default=list)
+    wishlist_items = models.JSONField(default=list)
+
+    class Meta:
+        db_table = 'users'
+
+class WareHouse(models.Model):
+    warehouse_id = models.AutoField(primary_key=True)
+    warehouse_name = models.CharField(max_length=255)
+    warehouse_location = models.CharField(max_length=255)
+    shelf_number = models.CharField(max_length=50)
+    reorder_point = models.IntegerField()
+
+class Campaign(models.Model):
+    # Marketing Campaign Information
+    campaign_id = models.AutoField(primary_key=True)
+    campaign_name = models.CharField(max_length=255, null=True, blank=True)
+    discount_code = models.CharField(max_length=50, null=True, blank=True)
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+
+class Product(models.Model):
+    product_id = models.AutoField(primary_key=True)
+    product_name = models.CharField(max_length=255)
+    product_description = models.TextField()
+    product_price = models.DecimalField(max_digits=10, decimal_places=2)
+    product_category = models.CharField(max_length=100)
+    product_subcategory = models.CharField(max_length=100)
+    product_brand = models.CharField(max_length=100)
+    product_stock = models.IntegerField()
+    product_ratings = models.JSONField(default=list)
+    warehouse_id = models.ForeignKey(WareHouse, on_delete=models.CASCADE)
+    campaign_id = models.ForeignKey(Campaign, null=True, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'products'
+
+
+
+class ProductReview(models.Model):
+    product_id = models.ForeignKey(Product, on_delete=models.CASCADE)
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    review_text = models.TextField(null=True, blank=True)
+    review_rating = models.IntegerField(null=True, blank=True)
+    review_date = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class Order(models.Model):
+    order_id = models.AutoField(primary_key=True)
+    order_date = models.DateTimeField()
+    order_status = models.CharField(max_length=50)
+    shipping_method = models.CharField(max_length=100)
+    tracking_number = models.CharField(max_length=100, null=True, blank=True)
+
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    product_id = models.ForeignKey(Product, on_delete=models.CASCADE)
+
+    quantity = models.IntegerField()
+    item_price = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        db_table = 'orders'
+
+
+class Payment(models.Model):
+    payment_id = models.CharField(max_length=100, primary_key=True)
+    payment_method = models.CharField(max_length=50)
+    payment_status = models.CharField(max_length=50)
+    transaction_id = models.CharField(max_length=100, null=True, blank=True)
+    order_id = models.ForeignKey(Order, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'payments'
+
+
+class Supplier(models.Model):
+    supplier_id = models.AutoField(primary_key=True)
+    supplier_name = models.CharField(max_length=255)
+    supplier_contact_name = models.CharField(max_length=255)
+    supplier_email = models.EmailField()
+    supplier_phone = models.CharField(max_length=20)
+
+class ProductSupplier(models.Model):
+    product_id = models.ForeignKey(Product, on_delete=models.CASCADE)
+    supplier_id = models.ForeignKey(Supplier, on_delete=models.CASCADE)
+
+
+# Customer Service Information
+class CustomerSupport(models.Model):
+    support_ticket_id = models.IntegerField(null=True, blank=True)
+    support_ticket_status = models.CharField(max_length=50, null=True, blank=True)
+    support_agent_name = models.CharField(max_length=255, null=True, blank=True)
+    user_id = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
+    order_id = models.ForeignKey(Order, null=True, on_delete=models.CASCADE)
+
+

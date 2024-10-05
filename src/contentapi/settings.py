@@ -24,6 +24,7 @@ env = environ.Env()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-14^vo1uhac=b!9o12a$^vy#63gsxkd31qij==dm_%yp!3qd*jh"
+JWT_SECRET_KEY = '05825ac5sk_d10esk_42bcsk_9999sk_94c3dea310db1728067022'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -80,6 +81,19 @@ WSGI_APPLICATION = "contentapi.wsgi.application"
 
 DATABASES = {"default": env.db()}
 
+# Auth Token
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'contentapi.SafeAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ]
+}
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -90,6 +104,13 @@ CACHES = {
         "KEY_PREFIX": "plato",
     }
 }
+
+BROKER_URL = env('REDIS_URL') if 'REDIS_URL' in env else 'redis://localhost:6379'
+CELERY_RESULT_BACKEND = env('REDIS_URL') if 'REDIS_URL' in env else 'redis://localhost:6379'
+CELERY_ACCEPT_CONTENT = ['application/json', 'application/x-python-serialize']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Dhaka'
 
 
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

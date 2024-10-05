@@ -1,11 +1,11 @@
 from django.contrib import admin
 from django.urls import path
 
-from contents.views import ContentAPIView, ContentStatsAPIView
+from src.contents.views import ContentAPIView, ContentStatsAPIView, ContentAPIViewUpdate, ContentStatsAPIViewUpdated
 
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    path("api/contents/stats/", ContentStatsAPIView.as_view(), name="api-contents-stats"),
-    path("api/contents/", ContentAPIView.as_view(), name="api-contents"),
+    path("api/contents/stats/", ContentStatsAPIViewUpdated.as_view(), name="api-contents-stats"),
+    path("api/contents/", ContentAPIViewUpdate.as_view(), name="api-contents"),
 ]

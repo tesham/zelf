@@ -3,7 +3,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from contents.models import Content, Author, Tag, ContentTag
-from contents.serializers import ContentSerializer, ContentPostSerializer
+from contents.serializers import ContentSerializer, ContentPostSerializer, ContentPostListSerializer
+
+from src.contents.datalayers import ContentDatalayer
 
 
 class ContentAPIView(APIView):
@@ -232,3 +234,194 @@ class ContentStatsAPIView(APIView):
             data["total_contents"] += 1
 
         return Response(data, status=status.HTTP_201_CREATED)
+
+
+
+
+class ContentAPIViewUpdate(APIView):
+
+    def get(self, request):
+        """
+        TODO: Client is complaining about the app performance, the app is loading very slowly, our QA identified that
+         this api is slow af. Make the api performant. Need to add pagination. But cannot use rest framework view set.
+         As frontend, app team already using this api, do not change the api schema.
+         Need to send some additional data as well,
+         --------------------------------
+         1. Total Engagement = like_count + comment_count + share_count
+         2. Engagement Rate = Total Engagement / Views
+         Users are complaining these additional data is wrong.
+         Need filter support for client side. Add filters for (author_id, author_username, timeframe )
+         For timeframe, the content's timestamp must be withing 'x' days.
+         Example: api_url?timeframe=7, will get contents that has timestamp now - '7' days
+         --------------------------------
+         So things to do:
+         1. Make the api performant
+         2. Fix the additional data point in the schema
+            - Total Engagement = like_count + comment_count + share_count
+            - Engagement Rate = Total Engagement / Views
+            - Tags: List of tags connected with the content
+         3. Filter Support for client side
+            - author_id: Author's db id
+            - author_username: Author's username
+            - timeframe: Content that has timestamp: now - 'x' days
+            - tag_id: Tag ID
+            - title (insensitive match IE: SQL `ilike %text%`)
+         4. Must not change the inner api schema
+         5. Remove metadata and secret value from schema
+         6. Add pagination
+            - Should have page number pagination
+            - Should have items per page support in query params
+            Example: `api_url?items_per_page=10&page=2`
+        """
+        try:
+
+            query_params = request.query_params.dict()
+            tag = query_params.get('tag', None)
+            author_id = query_params.get('author_id', None)
+            author_username = query_params.get('author_username', None)
+            timeframe = query_params.get('timeframe', None)
+            title = query_params.get('title', None)
+
+            page = int(query_params.get('page', 0))
+            items_per_page = int(query_params.get('items_per_page', 50))
+
+            start, end, page, limit = ContentDatalayer.get_start_end_index(page=page, size=items_per_page)
+
+            contents = ContentDatalayer.get_content_details(
+                tag=tag, author_id=author_id, author_username=author_username,
+                timeframe=timeframe, title=title
+            )
+
+            contents = contents[start:end]
+
+            data_list = []
+            for item in contents:
+                data_dict = dict(
+                    content=item,
+                    author=item.author
+                )
+
+                data_dict['content']['engagement_rate'] = item.engagement_rate
+                data_dict['content']['total_engagement'] = item.total_engagement
+                data_dict['content']['engagement_rate'] = item.engagement_rate
+                data_dict['content']['tags'] = item.tags
+                data_list.append(data_dict)
+
+
+            serialized = ContentSerializer(data_list, many=True)
+
+            # need to reformat
+
+            # if tag:
+            #     queryset = Content.objects.filter(
+            #         contenttag__tag__name=tag
+            #     ).order_by("-id")[:1000]
+            # else:
+            #     queryset = Content.objects.all()
+            # data_list = []
+            # for query in queryset:
+            #     author = Author.objects.get(id=query.author_id)
+            #     data = {
+            #         "content": query,
+            #         "author": author
+            #     }
+            #     data_list.append(data)
+            # serialized = ContentSerializer(data_list, many=True)
+            # for serialized_data in serialized.data:
+            #     # Calculating `Total Engagement`
+            #     # Calculating `Engagement Rate`
+            #     like_count = serialized_data.get("like_count", 0)
+            #     comment_count = serialized_data.get("comment_count", 0)
+            #     share_count = serialized_data.get("share_count", 0)
+            #     view_count = serialized_data.get("view_count", 0)
+            #     total_engagement = like_count + comment_count + share_count
+            #     if view_count > 0:
+            #         engagement_rate = total_engagement / view_count
+            #     else:
+            #         engagement_rate = 0
+            #     serialized_data["content"]["engagement_rate"] = engagement_rate
+            #     serialized_data["content"]["total_engagement"] = total_engagement
+            #     tags = list(
+            #         ContentTag.objects.filter(
+            #             content_id=serialized_data["content"]["id"]
+            #         ).values_list("tag__name", flat=True)
+            #     )
+            #     serialized_data["content"]["tags"] = tags
+            return Response(serialized.data, status=status.HTTP_200_OK)
+        except Exception as exe:
+            return Response(dict(error=str(exe)), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def post(self, request, ):
+        """
+        TODO: This api is very hard to read, and inefficient.
+         The users complaining that the contents they are seeing is not being updated.
+         Please find out, why the stats are not being updated.
+         ------------------
+         Things to change:
+         1. This api is hard to read, not developer friendly
+         2. Support list, make this api accept list of objects and save it
+         3. Fix the users complain
+        """
+        try:
+            serializer = ContentPostListSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            contents = ContentDatalayer.create_content_post(
+                list_data=serializer.validated_data
+            )
+
+            return Response(
+                contents, status=status.HTTP_200_OK
+            )
+
+        except Exception as exe:
+            return Response(dict(error=str(exe)), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class ContentStatsAPIViewUpdated(APIView):
+    """
+    TODO: This api is taking way too much time to resolve.
+     Contents that will be fetched using `ContentAPIView`, we need stats for that
+     So it must have the same filters as `ContentAPIView`
+     Filter Support for client side
+            - author_id: Author's db id
+            - author_username: Author's username
+            - timeframe: Content that has timestamp: now - 'x' days
+            - tag_id: Tag ID
+            - title (insensitive match IE: SQL `ilike %text%`)
+     -------------------------
+     Things To do:
+     1. Make the api performant
+     2. Fix the additional data point (IE: total engagement, total engagement rate)
+     3. Filter Support for client side
+         - author_id: Author's db id
+         - author_id: Author's db id
+         - author_username: Author's username
+         - timeframe: Content that has timestamp: now - 'x' days
+         - tag_id: Tag ID
+         - title (insensitive match IE: SQL `ilike %text%`)
+     --------------------------
+     Bonus: What changes do we need if we want timezone support?
+    """
+    def get(self, request):
+
+        try:
+            query_params = request.query_params.dict()
+
+            tag = query_params.get('tag', None)
+            author_id = query_params.get('author_id', None)
+            author_username = query_params.get('author_username', None)
+            timeframe = query_params.get('timeframe', None)
+            title = query_params.get('title', None)
+
+            data = ContentDatalayer.get_content_stat(
+                tag=tag, author_id=author_id, author_username=author_username, timeframe=timeframe,
+                title=title
+            )
+
+            return Response(data, status=status.HTTP_200_OK)
+
+        except Exception as exe:
+            return Response(dict(error=str(exe)), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

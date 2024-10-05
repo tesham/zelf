@@ -7,13 +7,15 @@ from contents.models import Content, Author
 class AuthorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Author
-        fields = '__all__'
+        # fields = '__all__'
+        exclude = ('big_metadata', 'secret_value',)
 
 
 class ContentBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Content
-        fields = '__all__'
+        exclude = ('big_metadata', 'secret_value', 'author', )
+        # fields = '__all__'
 
 
 class ContentSerializer(serializers.Serializer):
@@ -64,3 +66,11 @@ class ContentPostSerializer(serializers.Serializer):
     title = serializers.CharField(required=True)
     hashtags = serializers.ListField(child=serializers.CharField())
     timestamp = serializers.DateTimeField(required=True)
+
+class ContentPostListSerializer(serializers.Serializer):
+    contents = serializers.ListField(
+        child=ContentPostSerializer(),
+        allow_empty=True,
+        allow_null=True,
+        default=list
+    )
